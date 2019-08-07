@@ -24,7 +24,6 @@
             color: dodgerblue;
             cursor: pointer;
         }
-
         tr:hover {background-color: #3396ff;}
 
         input[type=text] {
@@ -79,7 +78,6 @@
         let endTime = new Date().getTime();
         let startTime = endTime - (15 * 60000);
 
-
         let checkURL = () => {
             //console.log("checkURL()-Begin");
 
@@ -91,7 +89,6 @@
                     ret = false;
                 }
             }
-
             // check WS URL empty
             if (WS_URL === "") {
                 WS_URL = document.getElementById("ws_url").value;
@@ -101,13 +98,12 @@
             }
             //console.log("checkURL()-End");
             return ret;
-        }
+        };
 
         //
         // on PWR.C Button clicked
         //
         let onPwrC = () => {
-            //console.log("onPwrC()-Begin");
             isMetricCSelected = !isMetricCSelected;
 
             if (checkURL() === false) {
@@ -122,22 +118,19 @@
                     .then(response => response.json())
                     .then(data => {
                         addMetricValuesToMainArray(data);
-                        connect_c();
+                        wsConnect("C");
                     });
             } else {
                 document.getElementById("btnPwrC").className = "button_disable";
-                disconnect_c();
+                wsDisconnect("C");
                 removeMetricValuesFromMainArray("pwr.c");
             }
-
-            //console.log("onPwrC()-End");
-        }
+        };
 
         //
         // on PWR.V Button clicked
         //
         let onPwrV = () => {
-            //console.log("onPwrV()-Begin");
             isMetricVSelected = !isMetricVSelected;
 
             if (checkURL() === false) {
@@ -151,19 +144,17 @@
                     .then(response => response.json())
                     .then(data => {
                         addMetricValuesToMainArray(data);
-                        connect_v();
+                        wsConnect("V");
                     });
             } else {
                 document.getElementById("btnPwrV").className = "button_disable";
-                disconnect_v();
+                wsDisconnect("V");
                 removeMetricValuesFromMainArray("pwr.v");
             }
-
-           //console.log("onPwrV()-End");
-        }
+        };
 
         //
-        // remove METRIC TYPR from array
+        // remove METRIC TYPE from array
         //
         let removeMetricValuesFromMainArray = (metricType) => {
             if (aTotalMetrics.length === 0)
@@ -181,8 +172,6 @@
         // Add METRIC TYPE Data to array
         //
         let addMetricValuesToMainArray = (aMetrics) => {
-            //console.log("addMetricValuesToMainArray-Begin");
-
             // add metric value to main array
             aMetrics.forEach(obj => {
                 aTotalMetrics.push(obj);
@@ -205,15 +194,12 @@
 
             // Refresh the screen
             displayOnScreen();
-
-            //console.log("addMetricValuesToMainArray-End");
-        }
+        };
 
         //
         // Display METRIC DATA in HTML Table format
         //
         displayOnScreen = () => {
-            //console.log("displayOnScreen()-Begin");
             let table = document.getElementById("metricTable");
 
             // clear table
@@ -231,18 +217,13 @@
                 cell2.innerHTML = new Date(obj.timestamp).toISOString();
                 cell3.innerHTML = obj.value;
             });
-
-            //console.log("displayOnScreen()-End");
-        }
+        };
 
         //
         // insert METRIC DATA dynamically into Array and HTML Table (to reduce the time)
         //
         let insertRow = (o)  => {
-
             let obj = JSON.parse(o);
-            //console.log("insertRow-Begin: obj: " + obj.timestamp);
-
             // get insert location in Array
             let insert_location  = aTotalMetrics.findIndex(m => {
                  return obj.timestamp <= m.timestamp;
@@ -271,15 +252,12 @@
             cell1.innerHTML = obj.id;
             cell2.innerHTML = new Date(obj.timestamp).toISOString();
             cell3.innerHTML = obj.value;
-
-            //console.log("insertRow-End");
-        }
+        };
 
         //
         // on TIMESTAMP column sort clicked
         //
         let onSort = () => {
-            //console.log("OnSort()-Begin");
             sortByAsc = !sortByAsc;
 
             if (sortByAsc)
@@ -292,13 +270,12 @@
 
             // Refresh the screen
             displayOnScreen();
+        };
 
-            //console.log("OnSort()-End");
-        }
-
+        //------------------------------------------------------
 
         //
-        // WEB SOCKETS - CREATED ONE EACH TYPE METRIC (TODO: Convert to Class based)
+        // WEB SOCKET
         //
         const WS_SUB_C ="subscribe pwr.c";
         const WS_SUB_V ="subscribe pwr.v";
@@ -306,101 +283,72 @@
         let websocket_c = undefined;
         let websocket_v = undefined;
 
-        function connect_c() {
-            websocket_c = new WebSocket(WS_URL);
-            websocket_c.onopen = function(evt) { onOpen_c(evt) };
-            websocket_c.onclose = function(evt) { onClose_c(evt) };
-            websocket_c.onmessage = function(evt) { onMessage_c(evt) };
-            websocket_c.onerror = function(evt) { onError_c(evt) };
+        class WebSocketCustom {
+
+            constructor(url, metricType) {
+                this.websocket = new WebSocket(url);
+                this.metricType = metricType;
+                this.websocket.onopen = (evt) => { this.onOpen(evt) };
+                this.websocket.onmessage = (evt) => { this.onMessage(evt) };
+                this.websocket.onerror = (evt) => { this.onError(evt) };
+            }
+
+            onOpen(evt) {
+                if (this.metricType === "C")
+                    this.doSend(WS_SUB_C);
+                else
+                    this.doSend(WS_SUB_V);
+            }
+
+            onMessage(evt) {
+                console.log('RESPONSE: ' + evt.data);
+                insertRow(evt.data);
+            }
+
+            onError(evt) {
+                console.log('ERROR:' + evt.data);
+            }
+
+            doSend(message) {
+                this.websocket.send(message);
+            }
+
+            disconnect() {
+                this.websocket.close();
+            }
         }
 
-        function onOpen_c(evt) {
-            //console.log("CONNECTED");
-            doSend_c(WS_SUB_C);
-        }
+        function wsConnect(metricType) {
+            if (metricType == "C")
+                websocket_c = new WebSocketCustom(WS_URL, metricType);
+            if (metricType == "V")
+                websocket_v = new WebSocketCustom(WS_URL, metricType);
 
-        function onClose_c(evt) {
-            //console.log("DISCONNECTED");
         }
-
-        function onMessage_c(evt) {
-            //console.log('RESPONSE: ' + evt.data);
-            insertRow(evt.data);
-        }
-
-        function onError_c(evt) {
-            //console.log('ERROR:' + evt.data);
-        }
-
-        function doSend_c(message) {
-            //console.log("SENT: " + message);
-            websocket_c.send(message);
-        }
-
-        function disconnect_c() {
-            websocket_c.close();
-        }
-
-
-        //
-        // WS PWR.W
-        //
-        function connect_v() {
-            websocket_v = new WebSocket(WS_URL);
-            websocket_v.onopen = function(evt) { onOpen_v(evt) };
-            websocket_v.onclose = function(evt) { onClose_v(evt) };
-            websocket_v.onmessage = function(evt) { onMessage_v(evt) };
-            websocket_v.onerror = function(evt) { onError_v(evt) };
-        }
-        function onOpen_v(evt) {
-            //console.log("CONNECTED");
-            doSend_v(WS_SUB_V);
-        }
-
-        function onClose_v(evt) {
-            //console.log("DISCONNECTED");
-        }
-
-        function onMessage_v(evt) {
-            //console.log('RESPONSE: ' + evt.data);
-            insertRow(evt.data);
-        }
-
-        function onError_v(evt) {
-            //console.log('ERROR:' + evt.data);
-        }
-
-        function doSend_v(message) {
-            //console.log("SENT: " + message);
-            websocket_v.send(message);
-        }
-
-        function disconnect_v() {
-            websocket_v.close();
+        function wsDisconnect( metricType ) {
+            if (metricType === "C")
+                websocket_c.disconnect();
+            if (metricType === "V")
+                websocket_v.disconnect();
         }
     </script>
-
-
 </head>
 <body style="background-color: #fff">
 <div >
     <div style="overflow-x:auto;">
         <div>
             <form>
-                <label for="url">Tutorial server history URL: <span style="color: #a1a5a9">(http://localhost:8081/history)</span></label>
+                <label for="url">Tutorial server history URL: <span style="color: #a1a5a9">(example: http://localhost:8081/history)</span></label>
                 <input type="text" id="url" name="url" value="http://localhost:8081/history">
 
-                <label for="ws_url">Tutorial server web Socket URL: <span style="color: #a1a5a9">(ws://localhost:8081/realtime)</span></label>
+                <label for="ws_url">Tutorial server web Socket URL: <span style="color: #a1a5a9">(example: ws://localhost:8081/realtime)</span></label>
                 <input type="text" id="ws_url" name="ws_url" value="ws://localhost:8081/realtime">
-
             </form>
         </div>
-
         <div>
             <button id="btnPwrC" class="button_disable" onclick="onPwrC() ">pwr.c</button>
             <button id="btnPwrV" class="button_disable" onclick="onPwrV()">pwr.v</button>
         </div>
-
         <table id="metricTable">
             <tr>
                 <th>ID</th>
