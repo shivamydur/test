@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>MCT Test</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #515559;
+            color: white;
+        }
+        #thSort {
+            color: dodgerblue;
+            cursor: pointer;
+        }
+
+        tr:hover {background-color: #3396ff;}
+
+        input[type=text] {
+            width: 100%;
+            padding: 8px 16px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            font-size: 16px;
+            color: #585858;
+            border: 1px solid #777;
+        }
+        .button_active {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+        .button_disable {
+            background-color: #a1a6a9;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+        .insert_row {
+            background-color: #e6f2ff;
+        }
+    </style>
+    <script>
+        // variables
+        let URL = "";
+        let WS_URL = "";
+
+        let aTotalMetrics = [];
+
+        let isMetricCSelected = false;
+        let isMetricVSelected = false;
+
+        let sortByAsc = true;
+
+        let endTime = new Date().getTime();
+        let startTime = endTime - (15 * 60000);
+
+
+        let checkURL = () => {
+            //console.log("checkURL()-Begin");
+
+            let ret = true;
+            // check URL empty
+            if (URL === "") {
+                URL = document.getElementById("url").value;
+                if (URL === "") {
+                    ret = false;
+                }
+            }
+
+            // check WS URL empty
+            if (WS_URL === "") {
+                WS_URL = document.getElementById("ws_url").value;
+                if(WS_URL === "") {
+                    ret = false;
+                }
+            }
+            //console.log("checkURL()-End");
+            return ret;
+        }
+
+        //
+        // on PWR.C Button clicked
+        //
+        let onPwrC = () => {
+            //console.log("onPwrC()-Begin");
+            isMetricCSelected = !isMetricCSelected;
+
+            if (checkURL() === false) {
+                alert("Please enter URLs");
+                return;
+            }
+
+            if (isMetricCSelected) {
+                document.getElementById("btnPwrC").className = "button_active";
+
+                fetch(URL + '/pwr.c?start=' + startTime + '&end=' + endTime)
+                    .then(response => response.json())
+                    .then(data => {
+                        addMetricValuesToMainArray(data);
+                        connect_c();
+                    });
+            } else {
+                document.getElementById("btnPwrC").className = "button_disable";
+                disconnect_c();
+                removeMetricValuesFromMainArray("pwr.c");
+            }
+
+            //console.log("onPwrC()-End");
+        }
+
+        //
+        // on PWR.V Button clicked
+        //
+        let onPwrV = () => {
+            //console.log("onPwrV()-Begin");
+            isMetricVSelected = !isMetricVSelected;
+
+            if (checkURL() === false) {
+                alert("Please enter URLs");
+                return;
+            }
+
+            if (isMetricVSelected) {
+                document.getElementById("btnPwrV").className = "button_active";
+                fetch(URL + '/pwr.v?start=' + startTime + '&end=' + endTime)
+                    .then(response => response.json())
+                    .then(data => {
+                        addMetricValuesToMainArray(data);
+                        connect_v();
+                    });
+            } else {
+                document.getElementById("btnPwrV").className = "button_disable";
+                disconnect_v();
+                removeMetricValuesFromMainArray("pwr.v");
+            }
+
+           //console.log("onPwrV()-End");
+        }
+
+        //
+        // remove METRIC TYPR from array
+        //
+        let removeMetricValuesFromMainArray = (metricType) => {
+            if (aTotalMetrics.length === 0)
+                return;
+
+            aTotalMetrics = aTotalMetrics.filter( obj => {
+                return (obj.id !== metricType)
+            });
+
+            // Refresh the screen
+            displayOnScreen();
+        };
+
+        //
+        // Add METRIC TYPE Data to array
+        //
+        let addMetricValuesToMainArray = (aMetrics) => {
+            //console.log("addMetricValuesToMainArray-Begin");
+
+            // add metric value to main array
+            aMetrics.forEach(obj => {
+                aTotalMetrics.push(obj);
+            });
+
+            // Sort array
+            aTotalMetrics.sort(function (o1, o2) {
+                let ret = 0;
+                if (o1.timestamp < o2.timestamp)
+                    ret = -1;
+                else if (o1.timestamp > o2.timestamp)
+                    ret = 1;
+                else 0;
+
+                if (!sortByAsc)
+                    ret = ret * (-1);
+
+                return ret;
+            });
+
+            // Refresh the screen
+            displayOnScreen();
+
+            //console.log("addMetricValuesToMainArray-End");
+        }
+
+        //
+        // Display METRIC DATA in HTML Table format
+        //
+        displayOnScreen = () => {
+            //console.log("displayOnScreen()-Begin");
+            let table = document.getElementById("metricTable");
+
+            // clear table
+            while (table.rows.length > 1) {
+                    table.deleteRow(1);
+            }
+
+            aTotalMetrics.map(obj => {
+                var rowLength = table.rows.length;
+                var row = table.insertRow(rowLength);
+                var cell1 = row.insertCell(0);
+                var cell2 = row.insertCell(1);
+                var cell3 = row.insertCell(2);
+                cell1.innerHTML = obj.id;
+                cell2.innerHTML = new Date(obj.timestamp).toISOString();
+                cell3.innerHTML = obj.value;
+            });
+
+            //console.log("displayOnScreen()-End");
+        }
+
+        //
+        // insert METRIC DATA dynamically into Array and HTML Table (to reduce the time)
+        //
+        let insertRow = (o)  => {
+
+            let obj = JSON.parse(o);
+            //console.log("insertRow-Begin: obj: " + obj.timestamp);
+
+            // get insert location in Array
+            let insert_location  = aTotalMetrics.findIndex(m => {
+                 return obj.timestamp <= m.timestamp;
+            });
+
+            let table = document.getElementById("metricTable");
+
+            if (insert_location >= 0) {
+                aTotalMetrics.splice(insert_location, 0, obj);
+                insert_location++;
+            } else if( insert_location === -1 && sortByAsc) {
+                aTotalMetrics.push(obj);
+                insert_location = table.rows.length;
+            } else if( insert_location === -1 && !sortByAsc) {
+                insert_location = 1;
+                aTotalMetrics.unshift(obj);
+            }
+
+            // insert into HTML table
+            let row = table.insertRow(insert_location);
+            row.className = "insert_row";
+            let cell1 = row.insertCell(0);
+            let cell2 = row.insertCell(1);
+            let cell3 = row.insertCell(2);
+
+            cell1.innerHTML = obj.id;
+            cell2.innerHTML = new Date(obj.timestamp).toISOString();
+            cell3.innerHTML = obj.value;
+
+            //console.log("insertRow-End");
+        }
+
+        //
+        // on TIMESTAMP column sort clicked
+        //
+        let onSort = () => {
+            //console.log("OnSort()-Begin");
+            sortByAsc = !sortByAsc;
+
+            if (sortByAsc)
+                document.getElementById("thSort").innerHTML = "Sort &#8595;";
+            else
+                document.getElementById("thSort").innerHTML = "Sort &#8593;";
+
+            // reverse the array
+            aTotalMetrics = aTotalMetrics.reverse();
+
+            // Refresh the screen
+            displayOnScreen();
+
+            //console.log("OnSort()-End");
+        }
+
+
+        //
+        // WEB SOCKETS - CREATED ONE EACH TYPE METRIC (TODO: Convert to Class based)
+        //
+        const WS_SUB_C ="subscribe pwr.c";
+        const WS_SUB_V ="subscribe pwr.v";
+
+        let websocket_c = undefined;
+        let websocket_v = undefined;
+
+        function connect_c() {
+            websocket_c = new WebSocket(WS_URL);
+            websocket_c.onopen = function(evt) { onOpen_c(evt) };
+            websocket_c.onclose = function(evt) { onClose_c(evt) };
+            websocket_c.onmessage = function(evt) { onMessage_c(evt) };
+            websocket_c.onerror = function(evt) { onError_c(evt) };
+        }
+
+        function onOpen_c(evt) {
+            //console.log("CONNECTED");
+            doSend_c(WS_SUB_C);
+        }
+
+        function onClose_c(evt) {
+            //console.log("DISCONNECTED");
+        }
+
+        function onMessage_c(evt) {
+            //console.log('RESPONSE: ' + evt.data);
+            insertRow(evt.data);
+        }
+
+        function onError_c(evt) {
+            //console.log('ERROR:' + evt.data);
+        }
+
+        function doSend_c(message) {
+            //console.log("SENT: " + message);
+            websocket_c.send(message);
+        }
+
+        function disconnect_c() {
+            websocket_c.close();
+        }
+
+
+        //
+        // WS PWR.W
+        //
+        function connect_v() {
+            websocket_v = new WebSocket(WS_URL);
+            websocket_v.onopen = function(evt) { onOpen_v(evt) };
+            websocket_v.onclose = function(evt) { onClose_v(evt) };
+            websocket_v.onmessage = function(evt) { onMessage_v(evt) };
+            websocket_v.onerror = function(evt) { onError_v(evt) };
+        }
+        function onOpen_v(evt) {
+            //console.log("CONNECTED");
+            doSend_v(WS_SUB_V);
+        }
+
+        function onClose_v(evt) {
+            //console.log("DISCONNECTED");
+        }
+
+        function onMessage_v(evt) {
+            //console.log('RESPONSE: ' + evt.data);
+            insertRow(evt.data);
+        }
+
+        function onError_v(evt) {
+            //console.log('ERROR:' + evt.data);
+        }
+
+        function doSend_v(message) {
+            //console.log("SENT: " + message);
+            websocket_v.send(message);
+        }
+
+        function disconnect_v() {
+            websocket_v.close();
+        }
+    </script>
+
+
+</head>
+<body style="background-color: #fff">
+<div >
+    <div style="overflow-x:auto;">
+        <div>
+            <form>
+                <label for="url">Tutorial server history URL: <span style="color: #a1a5a9">(http://localhost:8081/history)</span></label>
+                <input type="text" id="url" name="url" value="http://localhost:8081/history">
+
+                <label for="ws_url">Tutorial server web Socket URL: <span style="color: #a1a5a9">(ws://localhost:8081/realtime)</span></label>
+                <input type="text" id="ws_url" name="ws_url" value="ws://localhost:8081/realtime">
+
+            </form>
+        </div>
+
+        <div>
+            <button id="btnPwrC" class="button_disable" onclick="onPwrC() ">pwr.c</button>
+            <button id="btnPwrV" class="button_disable" onclick="onPwrV()">pwr.v</button>
+        </div>
+
+        <table id="metricTable">
+            <tr>
+                <th>ID</th>
+                <th><span id="thSort" onclick="onSort()">Sort &#8595;</span></th>
+                <th>Value</th>
+            </tr>
+        </table>
+    </div>
+</div>
+</body>
+</html>
