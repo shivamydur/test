@@ -13,8 +13,9 @@ Display the telemetric data in HTML table.
 4. Click either on "pwr.c" or "pwr.v" button
 5. Click on **timestamp** column header to sort by ASC or DESC
 
-Note:
-Clicking multiple times on button "pwr.c" or "pwr.v" will toggle the button status and content in HTML table.
+**Note:**
+1. Clicking multiple times on button "pwr.c" or "pwr.v" will toggle the button status and content in HTML table.
+2. See attachments (image) for sample output
   
 
 
